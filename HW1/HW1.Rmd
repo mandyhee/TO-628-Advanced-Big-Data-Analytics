@@ -1,6 +1,6 @@
 ---
 title: "Homework Assignment 1"
-author: "Meng-Ni Ho"
+author: "Mandy Ho"
 date: 'Assigned: Mar 19, 2020, Due Mar 29, 2020 11:59PM'
 output:
   html_document:
