@@ -1,0 +1,172 @@
+---
+title: "Logistics Regression Class Exercise"
+author: "Meng-Ni Ho"
+date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
+output: html_document
+---
+
+> We will do small exercise in Logistic Regression today. This will also become your submission for the day. We will do this work today in groups of two. This will later also become your submission for the next homework. For the class submission, only one submission per team is needed - mention in comments (and in author field above) who all worked on it together.
+
+
+## Titanic Survival Model
+
+We want to find out what factors affected passengers' survival when Titanic sank. As survival is a binary measure, this task is well suited for a Logistic Regression analysis.
+
+### Task A: Load and Explore the Data
+
+Training Data (data for building our model) is saved in the file TitanicTrain.csv
+
+You should import TitanicTrain.csv data. Check the structure of the data using str() function.
+
+- PClass: Passenger Class, Sibsp: Number of Siblings/Spouse aboard
+- Parch: Number of Parents/Children aboard
+- Are there variables that are not in the right class? If yes then convert those variables to the correct class
+
+```{r}
+#Enter your code for loading and exploring the data here.
+test = read.csv("TitanicTest.csv")
+train = read.csv("TitanicTrain.csv")
+str(train)
+summary(train)
+train$PassengerId <- NULL
+train$Name <- NULL
+train$Ticket <- NULL
+train$Cabin <- NULL
+train$Pclass <- as.factor(train$Pclass)
+train$Sex <- as.factor(train$Sex)
+```
+
+### Task B: Build Our Model
+
+Build a logistic regression model with Survival as the response variable. In this section, let's first build a main effects model. What variables do you need to include as the predictor variables?
+```{r}
+# Enter your code for your logistic regression model here.
+logit.model <- glm(Survived ~ ., data = train, family = "binomial")
+summary(logit.model)
+# AIC: 654.34
+```
+
+Building a model is always only the first step. The more important task is **interpreting** the model - what insights does your model give you?
+
+```{}
+Enter your text interpretation of your model here.
+In this model, we can see Pclass, sex, age and Sibsp show significant association with Survival.  
+For example, comparing to female, male has a 2.64 decrease log odds of survival. And for every one unit increase in age, there is a 0.04 decrease log odds of survival.
+```
+
+### Task C: Improve Our Model
+
+> We will likely not be able to do this during the class exercise. This task is for you to do as your homework. 
+
+How can we improve our model. There are several things you can try:
+
+- Do we need any interaction effects?
+- Do any of the variables have non-linear effects - should we include them in the model as a square term?
+- Can we clean the data better? Can we **infer** the missing values rather than losing all that information?
+
+Pay specific attention to how will you compare whether any particular model is **better** than other models. Potential choices are looking at the AIC value and ANOVA test for nested models.
+
+```{r}
+# Enter your code for improving your model here.
+
+# Age contains missing value, impute with mean
+train$Age[which(is.na(train$Age))] <- mean(train$Age, na.rm = T)
+
+# initial model
+logit.model <- glm(Survived ~ ., data = train, family = "binomial")
+summary(logit.model)
+# AIC: 805.74
+
+# backward selection: results: Pclass + Sex + Age + SibSp
+back_model <- step(logit.model, trace=0)
+
+
+# first: only include coefficient from backward selection
+logit.model2 <- glm(Survived ~ Pclass + Sex + Age + SibSp, data = train, family = "binomial")
+summary(logit.model2)
+# AIC: 802.84
+
+# second: add interactions
+logit.model3 <- glm(Survived ~ Pclass*Sex + SibSp*Sex + Pclass*SibSp, data = train, family = "binomial")
+summary(logit.model3)
+# AIC: 803.13
+
+# thidd: only include  Pclass*Sex interaction
+logit.model4 <- glm(Survived ~ Pclass*Sex + Age + SibSp, data = train, family = "binomial")
+summary(logit.model4)
+# AIC: 776.61
+
+# fourth: add square term for SibSp
+# why? SibSp: not following normal distribution, use hist(train$SibSp)
+SibSp2 = (train$SibSp)^2
+logit.model5 <- glm(Survived ~ Pclass*Sex + Age + SibSp2, data = train, family = "binomial")
+summary(logit.model5)
+
+# AIC: 770.45
+```
+
+What is your best model? Explain your best model - what are you seeing as significant? What is the interpretation? What does it mean?
+
+```{}
+Enter your text interpretation here.
+logit.model5 is our final mode, since it has the lowest AIC (770.45) among four models, the model includes Pclass, sex, age, Pclass and Sex interaction also square term of SibSp as covariates.
+And we can see a significant difference in log odds of survival between sex, age and SibSp. Moreover, the log odds of survival is also significantly different in passenger class 3 vs 1 by sex, and that comparing passenger class 3 vs 1, male has a 2.10 higher log odds of survival comparing to male.
+```
+
+### Task D: Predict Outcomes in Testing Data
+> We will likely not be able to do this during the class exercise. This task is for you to do as your homework. 
+
+We have saved a small part of data to test our model. This is the **Testing Data**. We will use this data to see how good of a prediction is made by the model we created in Task D above.
+
+You should do the following:
+
+- Import the testing data in TitanicTest.csv
+- Check that you have all the predictor variables. It will natually not have the response variable
+- Do any variable need recoding to match the training dataset? If yes then do the necessary variable recoding
+- Predict the Survival Probability for the Testing Dataset using the model developed on the training dataset in Step C above
+- Convert probabilities to a a binary outcome (1 for Prob > 0.5, otherwise 0 - or choose your own threshold)
+
+
+```{r}
+#Enter your code for predicting outcomes in testing data here.
+test$Pclass <- as.factor(test$Pclass)
+test$Sex <- as.factor(test$Sex)
+test$Age[which(is.na(test$Age))] <- mean(test$Age, na.rm = T)
+test$SibSp2 <- (test$SibSp)^2
+summary(test)
+
+fitted <- predict(logit.model5, newdata = test, type = "response")
+
+# convert prob to binary outcome
+fitted_prob <- ifelse(fitted > 0.5, 1, 0)
+```
+
+### Task E: Compete with Rest of the World
+
+What you just did happens to be one of the ongoing competitions at kaggle.com. https://www.kaggle.com/c/titanic has more details. Once you have predicted outcomes on the test data, you need to create a submission file that has two columns: "PasserngerID" and "Survived".
+The second column should have 1 or 0 for survived or not. NA or missing values in this field is not permitted. 
+
+```{r}
+test_predict <- data.frame(PassengerID = test$PassengerId, Survived = fitted_prob)
+# check NA
+sum(is.na(test_predict$Survived))
+write.csv(test_predict, file ="test_predict.csv", row.names = F)
+```
+
+Create an account at kaggle and upload your solution at https://www.kaggle.com/c/titanic/submit
+
+Kaggle will evaluate your submission and let you know 
+
+1. What is your score (how good is your prediction)
+2. What is your rank among all submissions 
+
+```{}
+Enter here the following:
+1. Your Kaggle Username: mandyho
+2. Your Kaggle Rank: 6620
+3. What did you learn in this exercise? Summarize your experience. What can you do better given more time?
+I've learned how to do missing data imputation and to continuously trying several ways to imporve the plot, for example, plot the distribution of the covariates and decide if the covariates need to be transformed or not.
+```
+
+
+> When you are done, submit you files (RMD and HTML) to Canvas for our weekly homework. Also **submit you Kaggle rank and username**. Lets see who in class gets the best rank on Kaggle. **There will be a surprise prize for the best submission!**

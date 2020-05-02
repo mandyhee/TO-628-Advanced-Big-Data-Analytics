@@ -1,0 +1,174 @@
+---
+title: "Homework Assignment 1"
+author: "Meng-Ni Ho"
+date: 'Assigned: Mar 19, 2020, Due Mar 29, 2020 11:59PM'
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+## HW-1 Instructions
+
+> Our class emphasizes clear communication of data analysis results to non-technical audiences. I expect your HTML output documents to be readable and well formatted. I expect you to put ample comments in your R code to make the code understandable. Along with accuracy of results, I am looking for quality of presentation as well. This homework is due by **11:59PM on Mar 29**.  To complete this assignment, follow these steps:
+
+1. Download the `HW1.Rmd` file from Canvas.
+
+2. Open `HW1.Rmd` in RStudio.
+
+3. Replace the "Your Name Here" text in the `author:` field with names of the students in HW team.
+
+4. Supply your solutions to the homework by editing `HW1.Rmd`.
+
+5. When you have completed the homework and have **checked** that your code both runs in the Console and knits correctly when you click `Knit HTML`, rename the R Markdown file to `HW1_YourNamesHere.Rmd`, and submit on Canvas.  (YourNameHere should be changed to your own names.) You should submit both the RMD file and its html output.
+
+6. Run your code in the Console and Knit HTML frequently to check for errors.
+
+7. You may find it easier to solve a problem by interacting only with the Console at first. 
+
+8. Note - you can insert an R block for writing your R code by either clicking the **insert** button or pressing Control-Alt-I.
+
+## Problem: Data frame basics
+
+We will continue working with the nycflights13 dataset we looked at last class. **Please be sure to keep the data file in the same directory as the RMD file.**
+
+First - lets read the data into an object named `nyc`.
+
+```{r}
+#install.packages("nycflights13") #Your should run this command only once
+library(nycflights13)
+nyc <- nycflights13::flights
+```
+
+I now would like you to answer the following - all in their own separate R code blocks.
+
+### Data Exploration
+
+Let's first do some simple exploration of this data. I would like for you to answer each of the questions below with an **inline R code** integrated into the text and not in a separate R code block.
+
+- How many airlines are there? (Hint: `levels` and `length` can be useful here)
+```{r}
+length(unique(nyc$carrier))
+```
+Answer: there are total `r length(unique(nyc$carrier))` airlines.
+
+- How many flights there were by the airline with code `OO`? (Hint: `nrow` can be useful here along with logical indexing)
+```{r}
+nrow(nyc[nyc$carrier == "OO",])
+```
+Answer: there are total `r nrow(nyc[nyc$carrier == "OO",])` airline with code `00`.
+
+
+- How long is the shortest flight out of any NYC airport? (Hint: `min` can be useful, remember to handle `NA` values)
+```{r}
+min(nyc[, "air_time"], na.rm = T)
+```
+Answer: the shortest flight out of any NYC airports is `r min(nyc[, "air_time"], na.rm = T)` minutes.
+
+- How many flights where there by United Airlines (code: UA) on Jan 12th 2013?
+```{r}
+nrow(nyc[nyc$carrier == "UA" & nyc$year == 2013 & nyc$month == 1 & nyc$day == 12, ])
+```
+Answer: there are `r nrow(nyc[nyc$carrier == "UA" & nyc$year == 2013 & nyc$month == 1 & nyc$day == 12, ])` flights by UA on 01-12-2013.
+
+### Arrival Delay
+
+Lets focus on Arrival Delay.
+
+- What was the average arrival delay for all airports and all airlines combined in Jan 2013? 
+```{r}
+mean(as.matrix(nyc[nyc$year == 2013 & nyc$month == 1, "arr_delay"]), na.rm = T)
+```
+Answer: average arrival delay for Jan 2013 was `r format(mean(as.matrix(nyc[nyc$year == 2013 & nyc$month == 1, "arr_delay"]), na.rm = T), digits = 2)` minutes.
+
+- Whats was the median arrival delay for all airports and all airlines combined in Jan 2013
+```{r}
+median(as.matrix(nyc[nyc$year == 2013 & nyc$month == 1, "arr_delay"]), na.rm = T)
+```
+Answer: median arrival delay for Jan 2013 was `r median(as.matrix(nyc[nyc$year == 2013 & nyc$month == 1, "arr_delay"]), na.rm = T)` minutes.
+
+Based on your answers to the two questions above, what can you say about the distribution of arrival delays? Provide your answer in a text paragraph form. 
+
+Since the median is lower than mean, we will be having a right skewed distribution, which means that we have lower number of data that are larger than the mean, comparing to the normal distribution, which median is equal to mean, indicating a symmetric numbers of values larger and smaller than the mean.
+
+### Airline Performance
+
+Lets see if all airlines are equally terrible as far as flight arrival delays are concerned. For this question you will have to make sure that airline column is coded as a factor.
+
+- Calculate average arrival delays by airline (Hint: look up the command `tapply`)
+```{r}
+avg_arr_delay = tapply(nyc$arr_delay, nyc$carrier, mean, na.rm = T)
+print(avg_arr_delay)
+```
+
+- Draw a Bar Plot of Average Arrival Delays for all the Airlines (Hint: command for making a Bar Plot is simply `barplot`)
+```{r}
+barplot(avg_arr_delay, cex.names = 0.7, xlab = "Airline Carrier", ylab = "Average flight delays", ylim = c(-10, 22))
+```
+
+
+- Which airline has the highest average arrival delay? Which airline has the smallest average arrival delay? Are there airlines that actually have negative average delay? Provide answer to this question in a text paragraph using **inline R code**.
+
+```{r}
+names(avg_arr_delay)[which(avg_arr_delay == max(avg_arr_delay))]
+names(avg_arr_delay)[which(avg_arr_delay == min(avg_arr_delay[avg_arr_delay > 0]))]
+names(avg_arr_delay)[which(avg_arr_delay < 0)]
+```
+
+The airline that has highest average arrival delay is `r names(avg_arr_delay)[which(avg_arr_delay == max(avg_arr_delay))]`. The airline that has lowest average arrival delay is `r names(avg_arr_delay)[which(avg_arr_delay == min(avg_arr_delay[avg_arr_delay > 0]))]`. At last, the arilines that show negative average delay are `r names(avg_arr_delay)[which(avg_arr_delay < 0)]`.
+
+
+### Air Gain
+
+We now want to know whether airlines actually make up time when on air. Create a new column named airgain such that airgain = (departure delay - arrival delay) : this is the amount of delay a flight made up while in air.
+```{r}
+nyc['airgain'] = (nyc$dep_delay - nyc$arr_delay)
+```
+
+
+- Explore airgain data and answer the question - do airlines actually gain any time when in air on average?
+```{r}
+colMeans(nyc['airgain'], na.rm = T)
+```
+Answer: yes, the airlines gain `r format(colMeans(nyc['airgain'], na.rm = T), digits = 2)` minutest on air in average.
+
+- Calculate average airgain for different airlines. 
+```{r}
+avg_airgain = tapply(nyc$airgain, nyc$carrier, mean, na.rm = T)
+print(avg_airgain)
+```
+
+
+- Build a visualization that shows which airlines are good at "catching up" when in air and which airlines actually lose time further after taking off.
+```{r}
+barplot(avg_airgain, cex.names = 0.7, xlab = "Airline Carrier", ylab = "Average airgain", ylim = c(-5, 16))
+```
+
+
+### Optimal Departure Time
+
+- Assume that you fly from NYC to Atlanta pretty often. You are interested in figuring out whether you should fly in morning (4am - 12Noon), afternoon (12Noon - 4pm), evening (4pm - 8pm) or night (8pm - 4am) if you are interested in having least amount of arrival delay. 
+
+```{r}
+nyc['hour_group'] = ifelse(nyc$dep_time >= 400 & nyc$dep_time < 1200, "morning",
+                           ifelse(nyc$dep_time > 1200 & nyc$dep_time < 1600, "afternoon",
+                                  ifelse(nyc$dep_time >= 1600 & nyc$dep_time < 2000, "evening",
+                                         ifelse(nyc$dep_time >= 2000 | nyc$dep_time < 400, "night", NA))))
+
+
+sub = nyc[nyc$dest == "ATL", ]
+arr_delay_by_time = tapply(sub$arr_delay, sub$hour_group, mean, na.rm = T)
+print(arr_delay_by_time)
+```
+
+Answer: should flight in the morning, since average arrival delay in the morning is `r format(min(arr_delay_by_time), digits = 2)` minutes.
+
+
+That's it. Once you are done, make sure everything works and knits well and then you can uplaod the RMD flile and the html output to Canvas.
+
+> Note that you are expected to seek help from the TAs and the Instructor in doing HWs. Office Hour schedule is posted on Canvas. Piazza site for the class is available for you to ask questions. You can also send emails to TAs and the Instructor. Please don't hesitate in asking for help.
+
+**Have Fun!**
+
+Sanjeev

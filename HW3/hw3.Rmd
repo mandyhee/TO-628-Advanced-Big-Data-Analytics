@@ -1,0 +1,397 @@
+---
+title: "TO628 HW3: Prediction of Tele-Marketing Call Success"
+author: "Meng-Ni Ho"
+date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
+output: 
+    html_document:
+      toc: true
+      toc_depth: 4 
+      toc_float: true  # add sidebar menu
+      theme: united
+      highlight: tango
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse, quietly = T)
+library(C50, quietly = T)
+library(e1071, quietly = T) 
+library(caret, quietly = T)
+library(class, quietly = T)
+library(neuralnet, quietly = T)
+library(nnet, quietly = T)
+library(knitr, quietly = T)
+library(rattle, quietly = T)
+library(NeuralNetTools, quietly = T)
+library(partykit, quietly = T)
+```
+
+### I. Objective
+Using Logistic Regression, ANN, kNN, SVM and Decision Trees to Predict Tele-Marketing Call Success. For this assignment, we will be looking at Tele-Marketing Data and attempt to predict whether the tele-marketing call will be successful or not.
+
+### II. Assignment Description
+1. Use the predictive analytics methodologies that we have learnt so far - Logistic Regression, kNN (k Nearest Neighbors), SVM, ANN and Decision Trees - to build a model that can help us predict whether a tele-marketing call would be successful or not.    
+2. The end product is a prediction on testing data (which you will create out of this dataset) and an effort to improve the prediction.    
+3. Create a combined prediction using the Stacked Model methodology.    
+4. Conclusion section and discuss whether you would want to use the kNN, SVM, ANN or the Combined prediction model to improve the success of the TeleMarketing efforts - and why. Focus on the business problem - the managerial decision making while choosing your preferred model.
+
+### III. Data Description
+We have information on more than 41,000 tele-marketing calls made by a bank to sell a product called term deposit. The data has information on which of these calls were actually successful in making a sale. As tele-marketing has very low conversion rates typically, if we can predict whether a customer is likely to buy or not, we can focus our tele-marketing efforts towards more willing buyers and save/make a ton of money.
+
+
+### IV. Data Variables
+
+##### A. Bank Client Data
+ 
+1 - age (numeric)   
+2 - job : type of job (categorical: 'admin.','blue-collar','entrepreneur','housemaid','management','retired','self-employed','services','student','technician','unemployed','unknown')    
+3 - marital : marital status (categorical: 'divorced','married','single','unknown'; note: 'divorced' means divorced or widowed)     
+4 - education (categorical: 'basic.4y','basic.6y','basic.9y','high.school','illiterate','professional.course','university.degree','unknown')    
+5 - default: has credit in default? (categorical: 'no','yes','unknown')        
+6 - housing: has housing loan? (categorical: 'no','yes','unknown')    
+7 - loan: has personal loan? (categorical: 'no','yes','unknown')    
+
+##### B. Data related with the last contact of the current campaign
+
+8 - contact: contact communication type (categorical: 'cellular','telephone')     
+9 - month: last contact month of year (categorical: 'jan', 'feb', 'mar', ..., 'nov', 'dec')    
+10 - day_of_week: last contact day of the week (categorical: 'mon','tue','wed','thu','fri')    
+11 - duration: last contact duration, in seconds (numeric).    
+Important note: this attribute highly affects the output target (e.g., if duration=0 then y='no'). Yet, the duration is not known before a call is performed. Also, after the end of the call y is obviously known. *Clearly - this variable SHOULD NOT be used in a predictive model. So Don't Use It!*
+
+##### C. Other Attributes
+
+12 - campaign: number of contacts performed during this campaign and for this client (numeric, includes last contact)   
+13 - pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)     
+14 - previous: number of contacts performed before this campaign and for this client (numeric)  
+15 - poutcome: outcome of the previous marketing campaign (categorical: 'failure','nonexistent','success')    
+
+##### D. Social and economic context attributes
+
+16 - emp.var.rate: employment variation rate - quarterly indicator (numeric)   
+17 - cons.price.idx: consumer price index - monthly indicator (numeric)    
+18 - cons.conf.idx: consumer confidence index - monthly indicator (numeric)    
+19 - euribor3m: euribor 3 month rate - daily indicator (numeric)   
+20 - nr.employed: number of employees - quarterly indicator (numeric)   
+
+##### E. Output variable (desired target)
+
+21 - y - has the client subscribed a term deposit? (binary: 'yes','no')     
+
+### V. Load Data and Data Cleaning
+```{r}
+tdata = read.csv("tele.csv", header = T, na.strings = c(" ", ''))
+
+# remove "X" and "duration"
+sdata = tdata %>% select(-X, -duration)
+
+# recode 999 in pdays to NA
+sdata$pdays = ifelse(sdata$pdays == 999,0, 1)
+str(sdata)
+
+# data normalization: z-Score Standardization for dataset
+scale.data = as.data.frame(lapply(sdata, function(x) {
+  if((class(x[1]) != "numeric") & (class(x[1]) != "integer")) {
+    return (x)
+  }
+  return(scale(x))
+}))
+
+# check missing data
+if (anyNA(scale.data) == FALSE){
+  print("There is no missing data/")
+} else{print("Need missing data imputation.")}
+
+```
+
+### VI. Split train and test set
+training set: N = 28831     
+testing set: N = 12357  
+
+```{r split}
+# split train and test dataset
+set.seed(40)
+train_ind = sample(seq_len(nrow(scale.data )), size = as.integer(dim(scale.data )[1]*0.7))
+
+train = sdata[train_ind,]
+test = sdata[-train_ind,]
+```
+
+### VII. Model Training
+```{r read_model}
+glm.model.file = "glm.rds"
+svm.linear.file = "svm_linear.rds"
+svm.radial.file = "svm_radial.rds"
+knn.file = "knn.rds"
+ds.tree.file = "ds_tree.rds"
+ann.file = "ann.rds"
+```
+
+#### 1. Logistic regression
+```{r LR, fig.height=10, fig.width=9}
+if (file.exists(glm.model.file)){
+  glm.model = readRDS(glm.model.file)
+} else{
+  system.time({
+  glm.model = train(form = y ~., data = train, method = "glm", family = "binomial", 
+                 trControl= trainControl()) 
+  })
+  saveRDS(glm.model, file = "glm.rds")
+}
+
+
+# estimate variable importance
+importance.glm = varImp(glm.model, scale=FALSE)
+plot(importance.glm)
+
+
+```
+
+#### 2. SVM: linear, radial kernal
+```{r svm}
+# linear kernal
+if (file.exists(svm.linear.file)){
+  svm.linear = readRDS(svm.linear.file)
+} else{
+  system.time({
+  svm.linear = svm(formula = y ~ ., 
+                 data = train, 
+                 type = 'C-classification', 
+                 kernel = 'linear') 
+  })
+  saveRDS(svm.linear, file = "svm_linear.rds")
+}
+
+
+# radial kernal
+if (file.exists(svm.radial.file)){
+  svm.radial = readRDS(svm.radial.file)
+} else{
+  system.time({
+  svm.radial = svm(formula = y ~ ., 
+                 data = train, 
+                 type = 'C-classification', 
+                 kernel = 'radial') 
+  })
+  saveRDS(svm.radial, file = "svm_radial.rds")
+}
+
+# system.time({
+#   svm.linear <- train(form = y ~., data = train, method = "svmLinear",
+#                  trControl= trainControl())
+# })
+
+```
+
+#### 3. kNN
+```{r knn}
+if (file.exists(knn.file)){
+  knn = readRDS(knn.file)
+} else{
+  system.time({
+  knn = train(form = y ~., data = train, method = "knn",
+                 trControl= trainControl()) 
+  })
+  saveRDS(knn, file = "knn.rds")
+}
+
+
+# plot knn
+plot(knn)
+
+# extract best k
+best_k = as.numeric(knn$bestTune)
+print(paste0("best k: ", best_k))
+
+# estimate variable importance
+importance.knn = varImp(knn, scale=FALSE)
+plot(importance.knn)
+```
+
+#### 4. Decision tree
+```{r ds_tree,fig.height=10, fig.width=9}
+if (file.exists(ds.tree.file)){
+  ds.tree = readRDS(ds.tree.file)
+} else{
+  system.time({
+  ds.tree = train(form = y ~., data = train, method = "rpart",
+                 trControl= trainControl()) 
+  })
+  saveRDS(ds.tree, file = "ds_tree.rds")
+}
+
+
+# plot decision tree
+fancyRpartPlot(ds.tree$finalModel) # from package "rattle"
+
+# estimate variable importance
+importance.ds.tree = varImp(ds.tree, scale=FALSE)
+plot(importance.ds.tree)
+
+```
+
+
+#### 5. ANN
+```{r ann, fig.height=10, fig.width=9}
+if (file.exists(ann.file)){
+  ann = readRDS(ann.file)
+} else{
+  system.time({
+  ann = train(form = y ~., data = train, 
+            method = "nnet", trControl = trainControl())
+  })
+  saveRDS(ann, file = "ann.rds")
+}
+
+
+# best tune: one hidden layer with 5 nodes
+best_t = ann$bestTune
+print(best_t)
+# plot ann
+plotnet(ann)
+
+# estimate variable importance
+importance.ann = varImp(ann, scale=FALSE)
+plot(importance.ann)
+```
+
+Summary:  
+1. the best k in the kNN model is `r best_k`.
+2. best tuning factor for ANN is 1 hidden layer with 5 nodes.
+3. Comparing variable inportance: the following table displays the highly important variables for each model
+
+| Model | Variables |
+|:----|:-----|
+| logistic regression | `month: March`, `emp.var.rate`, `contact by telephone`, `cons.price.idx` |
+| kNN | `nr.employed`, `euribor3m`, `emp.var.rate` |
+| Decision tree | `nr.employed`, `euribor3m`, `pdays`, `poutcome: Success`, `emp.var.rate`|
+| ANN | `nr.employed` | 
+   
+Therefore, we can see that variables `nr.employed` and `emp.var.rate` are important factors in predicting whether the customers will subscribe a term deposit or not.
+
+### VIII. Model prediction
+```{r pred, message=FALSE}
+# ===================================================
+# Logistic regression
+# ===================================================
+glm.pred = predict(glm.model, test %>% select(-y))
+glm.cm <- confusionMatrix(glm.pred, as.factor(test[, "y"]), positive = "yes")
+glm.accuracy <- round(as.numeric(glm.cm$overall[1])*100, digits = 2)
+glm.kappa <- round(as.numeric(glm.cm$overall[2]), digits = 2)
+glm.pred.table <- glm.cm$table
+print(glm.pred.table)
+
+# ===================================================
+# SVM linear & radial
+# ===================================================
+svm.linear.pred = predict(svm.linear, test %>% select(-y))
+svm.linear.cm <- confusionMatrix(svm.linear.pred, as.factor(test[, "y"]), positive = "yes")
+svm.linear.accuracy <- round(as.numeric(svm.linear.cm$overall[1])*100, digits = 2)
+svm.linear.kappa <- round(as.numeric(svm.linear.cm$overall[2]), digits = 2)
+svm.linear.pred.table <- svm.linear.cm$table
+print(svm.linear.pred.table)
+
+
+svm.radial.pred = predict(svm.radial, test %>% select(-y))
+svm.radial.cm <- confusionMatrix(svm.radial.pred, as.factor(test[, "y"]), positive = "yes")
+svm.radial.accuracy <- round(as.numeric(svm.radial.cm$overall[1])*100, digits = 2)
+svm.radial.kappa <- round(as.numeric(svm.radial.cm$overall[2]), digits = 2)
+svm.radial.pred.table <- svm.radial.cm$table
+print(svm.radial.pred.table)
+
+# ===================================================
+# kNN
+# ===================================================
+knn.pred = predict(knn, test %>% select(-y))
+knn.cm <- confusionMatrix(knn.pred, as.factor(test[, "y"]), positive = "yes")
+knn.accuracy <- round(as.numeric(knn.cm$overall[1])*100, digits = 2)
+knn.kappa <- round(as.numeric(knn.cm$overall[2]), digits = 2)
+knn.pred.table <- knn.cm$table
+print(knn.pred.table)
+
+
+# ===================================================
+# Decision tree
+# ===================================================
+ds.tree.pred = predict(ds.tree, test %>% select(-y))
+ds.tree.cm <- confusionMatrix(ds.tree.pred, as.factor(test[, "y"]), positive = "yes")
+ds.tree.accuracy <- round(as.numeric(ds.tree.cm$overall[1])*100, digits = 2)
+ds.tree.kappa <- round(as.numeric(ds.tree.cm$overall[2]), digits = 2)
+ds.tree.pred.table <- ds.tree.cm$table
+print(ds.tree.pred.table)
+
+# ===================================================
+# ANN
+# ===================================================
+ann.pred = predict(ann, test %>% select(-y))
+ann.cm <- confusionMatrix(ann.pred, as.factor(test[, "y"]), positive = "yes")
+ann.accuracy <- round(as.numeric(ann.cm$overall[1])*100, digits = 2)
+ann.kappa <- round(as.numeric(ann.cm$overall[2]), digits = 2)
+ann.pred.table <- ann.cm$table
+print(ann.pred.table)
+```
+
+
+IX. Model Comparison
+```{r}
+result.table = data.frame(Model = c("Logistic regression", "SVM Linear", "SVM Radial",
+                                    "kNN","Decision tree", "ANN"),
+                          Accuracy = c(glm.accuracy, svm.linear.accuracy, svm.radial.accuracy,
+                                       knn.accuracy,  ds.tree.accuracy, ann.accuracy),
+                          kappa = c(glm.kappa, svm.linear.kappa, svm.radial.kappa,
+                                       knn.kappa,  ds.tree.kappa, ann.kappa))
+kable(result.table)
+```
+
+There's no much difference in accuracy and kappa among the models.
+
+
+### X. Create a stack model
+
+```{r stack, fig.width=9, fig.height = 7}
+# get predictions from training data
+glm.train.pred = predict(glm.model, train %>% select(-y))
+svm.linear.train.pred = predict(svm.linear, train %>% select(-y))
+svm.radial.train.pred = predict(svm.radial, train %>% select(-y))
+knn.train.pred = predict(knn, train %>% select(-y))
+ds.tree.train.pred = predict(ds.tree, train %>% select(-y))
+ann.train.pred = predict(ann, train %>% select(-y))
+
+model_combined_results = data.frame(glm.train.pred, svm.linear.train.pred, svm.radial.train.pred , knn.train.pred, ds.tree.train.pred, ann.train.pred, train$y)
+colnames(model_combined_results) = c("LR", "smv linear", "svm radial", "knn", "ds tree", "ann", "y")
+
+# create stacking model with ctree
+
+stacked_model = ctree(y ~ . + 1, data = model_combined_results, control = ctree_control(mincriterion = .95)) 
+
+# plot the model
+plot(stacked_model)
+
+# create stack data with prediction resulted from testing set
+stacked_data = data.frame(glm.pred, svm.linear.pred, svm.radial.pred, knn.pred, ds.tree.pred, ann.pred)
+colnames(stacked_data) = c("LR", "smv linear", "svm radial", "knn", "ds tree", "ann")
+
+# predict stack with data with training model
+stacked_model_pred = predict(stacked_model, stacked_data)
+
+# confusion matrix
+stack.cm = confusionMatrix(stacked_model_pred , as.factor(test[, "y"]), positive = "yes")
+stack.accuracy = round(as.numeric(stack.cm$overall[1])*100, digits = 2)
+stack.kappa = round(as.numeric(stack.cm$overall[2]), digits = 2)
+stack.pred.table <- stack.cm$table
+print(stack.pred.table)
+print(stack.accuracy)
+print(stack.kappa)
+```
+
+The accuracy of the stacked model shows `r stack.accuracy`, kappa shows `r stack.kappa`, which is similar to individual models.
+
+### XI. Conclusion
+In conclusion, using stacked model does not demonstrate a great improvement of predicting term deposit subscription. By comparing the individual models, decision tree shows the highest accuracy: `r ds.tree.accuracy`, and kappa shows `r ds.tree.kappa`, indicates an improvement of training model comparing to "no information model". Therefore, we can proposed using decision tree to predict term deposit subscription. Moreover, these parameters show highly contribution in the decision tree: *number of employees*, *euribor 3 month rate*, *number of days after the client was contacted from a previous campaign*, *outcome of the previous marketing campaign*, *employment variation rate*. Therefore, monitoring these parameters for each client may help forecasting term deposit subscriptions. 
+
+ 
+
+
+ 
+
+
