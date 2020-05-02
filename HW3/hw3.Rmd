@@ -1,6 +1,6 @@
 ---
 title: "TO628 HW3: Prediction of Tele-Marketing Call Success"
-author: "Meng-Ni Ho"
+author: "Mandy Ho"
 date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
 output: 
     html_document:
