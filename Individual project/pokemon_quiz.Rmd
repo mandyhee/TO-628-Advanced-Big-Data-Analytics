@@ -1,6 +1,6 @@
 ---
 title: 'Pokemon: Who is Legendary? (Quiz)'
-author: "Meng-Ni Ho"
+author: "Mandy Ho"
 date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
 output: 
     html_document:
