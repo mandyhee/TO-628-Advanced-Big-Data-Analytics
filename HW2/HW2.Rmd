@@ -1,7 +1,7 @@
 ---
 title: "Logistics Regression Class Exercise"
-author: "Meng-Ni Ho"
-date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
+author: "Mandy Ho"
+date: 'Analyses completed: 2020-03-31'
 output: html_document
 ---
 

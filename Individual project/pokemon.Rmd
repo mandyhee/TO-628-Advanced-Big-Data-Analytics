@@ -1,7 +1,7 @@
 ---
 title: 'TO 628 Individual Project: "Pokemon" Who is Legendary?'
-author: "Meng-Ni Ho"
-date: 'Analyses completed: `r format(Sys.Date(), "%Y-%m-%d")`'
+author: "Mandy Ho"
+date: 'Analyses completed: 2020-04-26'
 output: 
     html_document:
       toc: true
