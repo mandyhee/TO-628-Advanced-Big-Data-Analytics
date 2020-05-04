@@ -10,6 +10,7 @@ Building logistic model using Titanic Survival Data, submit the testing results 
 
 ### Homework 3
 Prediction of Tele-Marketing Call Success (N = 41188) using logistic regression, SVM, decision tree, kNN, ANN, as well as applied stack model method and compared model performance. Data preprocessiong including data cleaning, data exploration and normalization.   
+Data source: https://www.kaggle.com/c/launchds-classification/overview.    
 Note: models were not pushed to repo due to insufficient memory.
 
 ### Individual project
